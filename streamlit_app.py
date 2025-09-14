@@ -599,94 +599,23 @@ with tab4:
 # Export functionality
 st.markdown('<h2 class="sub-header">💾 Export Results</h2>', unsafe_allow_html=True)
 
+# Google Sheets export temporarily disabled for debugging
+# Uncomment this section when authentication issues are resolved
+"""
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    # Add authentication method selector
-    auth_method = st.selectbox(
-        "🔐 Authentication Method:",
-        ["Personal Google Account (Recommended)", "Service Account"],
-        help="Personal account uses your Google Drive storage. Service account has limited storage but no browser login required."
-    )
-
-    if st.button("📊 Export to Google Sheets", type="primary"):
-        with st.spinner("Creating Google Sheet..."):
-            try:
-                # Create Google Sheets exporter based on selected method
-                use_personal = auth_method.startswith("Personal")
-                exporter = GoogleSheetsExporter(use_personal_account=use_personal)
-
-                if use_personal:
-                    import platform
-                    is_wsl = 'microsoft' in platform.uname().release.lower()
-                    if is_wsl:
-                        st.info("🌐 **WSL detected:** Manual authentication will be required. Follow the console instructions that appear below.")
-                    else:
-                        st.info("🌐 **First time?** Your browser will open for Google login. After login, sheets will be created in your Google Drive automatically.")
-
-                # Create the sheet
-                sheet_url = exporter.create_mortgage_analysis_sheet(scenarios, analyzer)
-
-                st.success("✅ Google Sheet created successfully!")
-                st.markdown(f"**📋 [Open your analysis in Google Sheets]({sheet_url})**")
-
-                if use_personal:
-                    st.markdown("✨ *Sheet created in YOUR Google Drive - unlimited storage!*")
-                else:
-                    st.markdown("💡 *Share this link with friends to show your mortgage analysis*")
-
-            except Exception as e:
-                st.error(f"❌ Failed to create Google Sheet: {str(e)}")
-
-                if use_personal and ("oauth2_credentials.json" in str(e) or "OAuth2" in str(e)):
-                    st.warning("🚨 **OAuth2 Credentials Missing**")
-                    st.info("""
-                    **Personal Google Account setup required:**
-
-                    1. **Download your OAuth2 credentials** from Google Cloud Console
-                    2. **Rename the file** to `oauth2_credentials.json`
-                    3. **Place it** in your project folder
-                    4. **Try export again** - your browser will open for login
-
-                    **Need detailed steps?** Check the setup guide below.
-                    """)
-
-                elif "storage quota" in str(e).lower() or "quota" in str(e).lower():
-                    st.warning("🚨 **Service Account Storage Full**")
-                    st.info("""
-                    **Switch to Personal Google Account method above** - it uses YOUR Google Drive storage (unlimited).
-
-                    Or use CSV export as a fallback.
-                    """)
-
-                with st.expander("🔧 Setup Instructions"):
-                    st.markdown("""
-                    ## Personal Google Account Setup (Recommended)
-
-                    **You'll need OAuth2 credentials for personal account access:**
-
-                    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-                    2. Select your existing project
-                    3. Go to "APIs & Services" → "Credentials"
-                    4. Click "Create Credentials" → "OAuth 2.0 Client IDs"
-                    5. Choose "Desktop Application"
-                    6. Download the JSON file
-                    7. Rename it to `oauth2_credentials.json`
-                    8. Place in your project folder
-
-                    **First time login:** Your browser will open for Google authentication.
-                    **After that:** Automatic sheet creation in your Google Drive!
-
-                    ---
-
-                    ## Service Account (Limited Storage)
-                    - Uses `google_credentials.json` (you already have this)
-                    - Limited to 15GB storage across all users
-                    - No browser login required
-                    """)
+    st.info("🚧 **Google Sheets Export**: Temporarily disabled for maintenance. Use CSV export below for now.")
+    # Google Sheets export code commented out for now
+    # Will be re-enabled once authentication issues are resolved
 
 with col2:
-    if st.button("📥 Generate CSV Export", type="secondary"):
+"""
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("📊 Generate CSV Export", type="primary"):
         # Create CSV data
         csv_df = analyzer.export_results(scenarios, 'temp.csv')
 
@@ -704,7 +633,16 @@ with col2:
 
         st.success("✅ CSV file ready for download!")
 
-with col3:
+        # Add helpful instructions for Google Sheets import
+        st.info("""
+        **💡 To import to Google Sheets:**
+        1. Go to [Google Sheets](https://sheets.google.com)
+        2. Create a new sheet
+        3. File → Import → Upload your downloaded CSV
+        4. Share the sheet with friends and family!
+        """)
+
+with col2:
     if st.button("📄 Generate Summary Report", type="secondary"):
         # Create summary report
         report = f"""# Mortgage Analysis Report
