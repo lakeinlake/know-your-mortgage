@@ -547,8 +547,13 @@ class GoogleSheetsExporter:
                 is_cloud = os.getenv('STREAMLIT_SHARING_MODE') is not None
 
                 if is_cloud:
-                    # Cloud environment - use standard OAuth flow
-                    creds = flow.run_local_server(port=0)
+                    # Cloud environment - OAuth2 needs different approach
+                    # For now, let's try the manual flow which is more reliable in cloud
+                    flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
+                    auth_url, _ = flow.authorization_url(prompt='consent')
+
+                    # This won't work well in Streamlit Cloud, so we'll fall back to service account
+                    raise Exception("Personal Google Account requires manual setup in cloud. Please use Service Account method or CSV export.")
                 elif is_wsl:
                     # WSL-friendly: Don't auto-open browser, show manual instructions
                     print("🌐 WSL detected - Manual authentication required:")
@@ -580,17 +585,20 @@ class GoogleSheetsExporter:
             # Try Streamlit secrets first (for cloud deployment)
             import streamlit as st
             if hasattr(st, 'secrets') and 'oauth2_credentials' in st.secrets:
+                # Convert Streamlit secrets to proper OAuth2 config format
+                secrets = st.secrets['oauth2_credentials']
                 return {
                     'installed': {
-                        'client_id': st.secrets['oauth2_credentials']['client_id'],
-                        'client_secret': st.secrets['oauth2_credentials']['client_secret'],
-                        'auth_uri': st.secrets['oauth2_credentials']['auth_uri'],
-                        'token_uri': st.secrets['oauth2_credentials']['token_uri'],
-                        'auth_provider_x509_cert_url': st.secrets['oauth2_credentials']['auth_provider_x509_cert_url'],
-                        'redirect_uris': st.secrets['oauth2_credentials']['redirect_uris']
+                        'client_id': secrets['client_id'],
+                        'client_secret': secrets['client_secret'],
+                        'auth_uri': secrets.get('auth_uri', 'https://accounts.google.com/o/oauth2/auth'),
+                        'token_uri': secrets.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                        'auth_provider_x509_cert_url': secrets.get('auth_provider_x509_cert_url', 'https://www.googleapis.com/oauth2/v1/certs'),
+                        'redirect_uris': secrets.get('redirect_uris', ['http://localhost'])
                     }
                 }
-        except (ImportError, KeyError, AttributeError):
+        except (ImportError, KeyError, AttributeError) as e:
+            print(f"Streamlit secrets error: {e}")
             pass
 
         # Fallback to local file
@@ -602,14 +610,30 @@ class GoogleSheetsExporter:
 
     def _authenticate_service_account(self):
         """Authenticate using service account."""
+        try:
+            # Try Streamlit secrets first (for cloud deployment)
+            import streamlit as st
+            if hasattr(st, 'secrets') and 'service_account' in st.secrets:
+                # Use service account from Streamlit secrets
+                service_account_info = dict(st.secrets['service_account'])
+                self.gc = gspread.service_account_from_dict(service_account_info)
+                return True
+        except (ImportError, KeyError, AttributeError) as e:
+            print(f"Streamlit service account secrets error: {e}")
+            pass
+
+        # Fallback to local file
         if self.service_account_path and os.path.exists(self.service_account_path):
             self.gc = gspread.service_account(filename=self.service_account_path)
             return True
         else:
             # Try to use default credentials (for Google Cloud environments)
-            creds, _ = default()
-            self.gc = gspread.authorize(creds)
-            return True
+            try:
+                creds, _ = default()
+                self.gc = gspread.authorize(creds)
+                return True
+            except:
+                raise Exception("No valid service account credentials found")
 
     def create_mortgage_analysis_sheet(self, scenarios: List[MortgageScenario], analyzer: 'MortgageAnalyzer') -> str:
         """
