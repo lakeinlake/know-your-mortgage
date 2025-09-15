@@ -31,6 +31,21 @@ class MortgageScenario:
     emergency_fund: float = 50000
 
 
+@dataclass
+class RentScenario:
+    """Data class for rent vs buy scenario parameters."""
+    name: str
+    home_price: float
+    monthly_rent: float
+    annual_rent_increase: float = 0.03
+    renters_insurance: float = 200
+    down_payment_invested: float = 100000
+    closing_costs: float = 15000
+    inflation_rate: float = 0.03
+    stock_return_rate: float = 0.08
+    emergency_fund: float = 50000
+
+
 class MortgageAnalyzer:
     """Comprehensive mortgage analysis tool for comparing different financing scenarios."""
 
@@ -321,6 +336,121 @@ class MortgageAnalyzer:
 
         return results
 
+    def analyze_rent_scenario(self, rent_scenario: RentScenario) -> Dict:
+        """
+        Perform comprehensive analysis of a rent scenario.
+
+        Args:
+            rent_scenario: RentScenario object with all parameters
+
+        Returns:
+            Dictionary containing all analysis results
+        """
+        results = {
+            'name': rent_scenario.name,
+            'home_price': rent_scenario.home_price,
+            'monthly_rent': rent_scenario.monthly_rent,
+            'total_rent_paid': 0,
+            'yearly_data': [],
+            'final_net_worth': 0,
+            'final_net_worth_adjusted': 0,
+            'break_even_year': None
+        }
+
+        # Initial investment: down payment + closing costs
+        initial_investment = rent_scenario.down_payment_invested + rent_scenario.closing_costs
+
+        # Track cumulative rent and investment growth
+        cumulative_rent = 0
+        monthly_rent = rent_scenario.monthly_rent
+
+        for year in range(1, self.analysis_period + 1):
+            # Calculate current year's rent (with annual increases)
+            current_monthly_rent = rent_scenario.monthly_rent * (1 + rent_scenario.annual_rent_increase)**(year - 1)
+            annual_rent = current_monthly_rent * 12
+            annual_insurance = rent_scenario.renters_insurance
+
+            cumulative_rent += annual_rent + annual_insurance
+
+            # Investment growth (down payment + closing costs invested)
+            investment_value = self.calculate_investment_growth(
+                initial_investment,
+                0,  # No additional monthly contributions for base case
+                rent_scenario.stock_return_rate,
+                year
+            )
+
+            # Calculate what the home would be worth if bought
+            home_value_if_bought = rent_scenario.home_price * (1 + 0.05)**year  # Assume 5% appreciation
+
+            # Net worth as renter: investments + emergency fund - cumulative rent spent
+            net_worth = investment_value + rent_scenario.emergency_fund
+            net_worth_adjusted = self.adjust_for_inflation(net_worth, year, rent_scenario.inflation_rate)
+
+            # For comparison: net worth if bought the home (assuming same mortgage scenario)
+            # This helps calculate break-even point
+
+            results['yearly_data'].append({
+                'year': year,
+                'monthly_rent': current_monthly_rent,
+                'annual_rent_paid': annual_rent,
+                'cumulative_rent_paid': cumulative_rent,
+                'investment_value': investment_value,
+                'home_value_if_bought': home_value_if_bought,
+                'net_worth': net_worth,
+                'net_worth_adjusted': net_worth_adjusted,
+                'annual_housing_cost': annual_rent + annual_insurance
+            })
+
+        results['total_rent_paid'] = cumulative_rent
+        results['final_net_worth'] = results['yearly_data'][-1]['net_worth']
+        results['final_net_worth_adjusted'] = results['yearly_data'][-1]['net_worth_adjusted']
+
+        return results
+
+    def calculate_break_even_analysis(self, rent_scenario: RentScenario,
+                                    buy_scenario: MortgageScenario) -> Dict:
+        """
+        Calculate when buying becomes better than renting financially.
+
+        Args:
+            rent_scenario: RentScenario object
+            buy_scenario: MortgageScenario object to compare against
+
+        Returns:
+            Dictionary with break-even analysis results
+        """
+        rent_results = self.analyze_rent_scenario(rent_scenario)
+        buy_results = self.analyze_scenario(buy_scenario)
+
+        break_even_year = None
+        yearly_comparison = []
+
+        for year in range(1, min(len(rent_results['yearly_data']), len(buy_results['yearly_data'])) + 1):
+            rent_net_worth = rent_results['yearly_data'][year-1]['net_worth_adjusted']
+            buy_net_worth = buy_results['yearly_data'][year-1]['net_worth_adjusted']
+
+            difference = buy_net_worth - rent_net_worth
+
+            if break_even_year is None and buy_net_worth > rent_net_worth:
+                break_even_year = year
+
+            yearly_comparison.append({
+                'year': year,
+                'rent_net_worth': rent_net_worth,
+                'buy_net_worth': buy_net_worth,
+                'buy_advantage': difference,
+                'buy_is_better': buy_net_worth > rent_net_worth
+            })
+
+        return {
+            'break_even_year': break_even_year,
+            'yearly_comparison': yearly_comparison,
+            'final_rent_net_worth': rent_results['final_net_worth_adjusted'],
+            'final_buy_net_worth': buy_results['final_net_worth_adjusted'],
+            'total_advantage': buy_results['final_net_worth_adjusted'] - rent_results['final_net_worth_adjusted']
+        }
+
     def create_scenarios(self, home_price: float, rate_15yr: float = 0.056,
                         rate_30yr: float = 0.061, stock_return: float = 0.08,
                         inflation: float = 0.03) -> List[MortgageScenario]:
@@ -385,6 +515,39 @@ class MortgageAnalyzer:
         ]
 
         return scenarios
+
+    def create_rent_scenario(self, home_price: float, monthly_rent: float = None,
+                           annual_rent_increase: float = 0.03,
+                           stock_return: float = 0.08, inflation: float = 0.03) -> RentScenario:
+        """
+        Create a rent scenario for comparison.
+
+        Args:
+            home_price: Price of the home (for comparison)
+            monthly_rent: Monthly rent amount (if None, estimate as 0.5% of home price)
+            annual_rent_increase: Annual rent increase rate
+            stock_return: Expected stock market return
+            inflation: Expected inflation rate
+
+        Returns:
+            RentScenario object
+        """
+        if monthly_rent is None:
+            # Rule of thumb: rent is often around 0.5% of home value per month
+            monthly_rent = home_price * 0.005
+
+        return RentScenario(
+            name="Rent Instead",
+            home_price=home_price,
+            monthly_rent=monthly_rent,
+            annual_rent_increase=annual_rent_increase,
+            renters_insurance=200,  # Annual renters insurance
+            down_payment_invested=100000,  # Amount that would have been down payment
+            closing_costs=home_price * 0.03,  # Typical closing costs ~3%
+            inflation_rate=inflation,
+            stock_return_rate=stock_return,
+            emergency_fund=self.emergency_fund
+        )
 
     def compare_scenarios(self, scenarios: List[MortgageScenario]) -> pd.DataFrame:
         """
