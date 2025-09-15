@@ -601,16 +601,15 @@ st.markdown('<h2 class="sub-header">💾 Export Results</h2>', unsafe_allow_html
 
 # Google Sheets export temporarily disabled for debugging
 # Uncomment this section when authentication issues are resolved
-"""
-col1, col2, col3 = st.columns(3)
 
-with col1:
-    st.info("🚧 **Google Sheets Export**: Temporarily disabled for maintenance. Use CSV export below for now.")
-    # Google Sheets export code commented out for now
-    # Will be re-enabled once authentication issues are resolved
-
-with col2:
-"""
+# col1, col2, col3 = st.columns(3)
+#
+# with col1:
+#     st.info("🚧 **Google Sheets Export**: Temporarily disabled for maintenance. Use CSV export below for now.")
+#     # Google Sheets export code commented out for now
+#     # Will be re-enabled once authentication issues are resolved
+#
+# with col2:
 
 col1, col2 = st.columns(2)
 
