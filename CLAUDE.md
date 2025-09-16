@@ -14,11 +14,20 @@
 **Live Production:** https://know-your-mortgage-e7xnzpbgxc2oqqugtgjvye.streamlit.app/
 
 ## Key Files & Architecture
-- `streamlit_app.py` - Main web dashboard (58K+ lines, comprehensive UI)
+**Multi-Page Streamlit Architecture (v2.1.0+):**
+- `streamlit_app.py` - Landing page and navigation hub (358 lines)
+- `pages/` - Streamlit multi-page structure:
+  - `1_📚_Education.py` - Educational content & financial glossary
+  - `2_🏠_Mortgage_Analysis.py` - Auto-running mortgage scenario comparisons
+  - `3_🏢_Rent_vs_Buy.py` - Auto-running rent vs buy analysis
+  - `4_📊_Financial_Health.py` - Financial readiness dashboard
+  - `5_💾_Export_Reports.py` - Professional reports & CSV exports
+- `utils/shared_components.py` - Common functions, styling, and state-specific tax data
 - `mortgage_analyzer.py` - Core calculation engine (40K+ lines, advanced modeling)
 - `app.py` - Clean deployment entry point
 - `requirements.txt` - Python dependencies
 - `tests/` - Comprehensive test suite with 4 test scripts
+- `backups/` - Backup files and development history
 - `CHANGELOG.md` - Complete version history and feature documentation
 - `PROJECT_SUMMARY.md` - Development overview and achievements
 - `README.md` - User-facing comprehensive documentation
@@ -36,16 +45,18 @@ pip install -r requirements.txt
 
 ### Running the Application
 ```bash
-# Start the Streamlit dashboard
+# Start the Streamlit multi-page application
 streamlit run streamlit_app.py
 
 # Access at: http://localhost:8501
+# Navigation: Use sidebar to access different pages
 ```
 
 ### Development Workflow
 ```bash
-# Check code quality (if tools available)
+# Check code quality (all pages)
 python -m py_compile mortgage_analyzer.py streamlit_app.py
+python -m py_compile pages/*.py utils/shared_components.py
 
 # Test all features comprehensively
 cd tests && python run_all_tests.py
@@ -100,24 +111,28 @@ python -c "from mortgage_analyzer import MortgageAnalyzer, RentScenario; print('
 ## Common Development Tasks
 
 ### Adding New Features
-- **Mortgage scenarios:** Modify scenario creation in `streamlit_app.py`
+- **Mortgage scenarios:** Modify scenario creation in relevant page files (`pages/2_🏠_Mortgage_Analysis.py`)
 - **Financial calculations:** Add methods to `MortgageAnalyzer` class in `mortgage_analyzer.py`
-- **Educational content:** Update glossary and golden rules in `show_golden_rules()` function
-- **State data:** Update state tax/property tax dictionaries in tax selection section
-- **Visualizations:** Add/modify Plotly charts in dashboard sections
+- **Educational content:** Update glossary and golden rules in `utils/shared_components.py`
+- **State data:** Update state tax/property tax dictionaries in `add_tax_selection_sidebar()` function
+- **Visualizations:** Add/modify Plotly charts in respective page files
+- **Navigation:** Update landing page (`streamlit_app.py`) for new pages
+- **Shared components:** Add common functions to `utils/shared_components.py`
 
 ### Testing & Validation
 - **Run full test suite:** `cd tests && python run_all_tests.py`
-- **Syntax validation:** `python -m py_compile *.py`
+- **Syntax validation:** `python -m py_compile pages/*.py utils/shared_components.py mortgage_analyzer.py streamlit_app.py`
 - **Feature testing:** Use individual test scripts for specific components
 - **UI testing:** Run locally with `streamlit run streamlit_app.py`
+- **Page isolation:** Test individual pages by navigating through the multi-page interface
 
 ### Common Modifications
-- **Add new glossary terms:** Update comprehensive glossary in `streamlit_app.py`
-- **State-specific data:** Modify tax rate or property tax dictionaries
-- **Educational content:** Enhance golden rules or add new tips
-- **Export formats:** Add new report types in export section
-- **Financial metrics:** Update dashboard calculations or thresholds
+- **Add new glossary terms:** Update comprehensive glossary in `utils/shared_components.py`
+- **State-specific data:** Modify tax rate or property tax dictionaries in `add_tax_selection_sidebar()`
+- **Educational content:** Enhance golden rules or add new tips in shared components
+- **Export formats:** Add new report types in `pages/5_💾_Export_Reports.py`
+- **Financial metrics:** Update dashboard calculations in `pages/4_📊_Financial_Health.py`
+- **Page navigation:** Modify landing page structure in `streamlit_app.py`
 
 ## Dependencies & Tech Stack
 ```txt
@@ -160,8 +175,9 @@ datetime
 - **Export:** Multiple professional report formats
 
 ## Development Status
-- **Version:** 2.0.0 (Major Educational Platform Release)
-- **Status:** Production ready with comprehensive feature set
+- **Version:** 2.1.0 (Multi-Page Architecture + State Tax Integration)
+- **Status:** Production ready with modular multi-page structure
+- **Architecture:** Streamlit native multi-page application
 - **Testing:** 100% feature coverage with automated test suite
 - **Deployment:** Live on Streamlit Cloud with automatic updates
 - **Quality:** Professional-grade code with extensive documentation
