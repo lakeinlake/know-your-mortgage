@@ -7,7 +7,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mortgage_analyzer import MortgageAnalyzer, MortgageScenario
-from utils.shared_components import apply_custom_css, check_pmi_requirement, calculate_recommended_emergency_fund, add_tax_selection_sidebar
+from src.utils.shared_components import apply_custom_css, check_pmi_requirement, calculate_recommended_emergency_fund
+from src.utils.state_manager import initialize, AppState
+from src.utils.ui_components import create_tax_sidebar, create_financial_health_sidebar
 
 st.set_page_config(
     page_title="Financial Health - Know Your Mortgage",
@@ -27,8 +29,12 @@ cash reserves, income stability, and provides personalized recommendations for y
 
 st.sidebar.header("💰 Your Financial Profile")
 
-# State and tax selection
-selected_state, tax_rate, property_tax_rate = add_tax_selection_sidebar()
+# 1. Initialize state
+initialize()
+
+# 2. Render UI and get computed values directly
+selected_state, tax_rate, property_tax_rate = create_tax_sidebar()
+health_params = create_financial_health_sidebar()
 
 with st.sidebar.expander("💡 Financial Health Guidelines"):
     st.markdown("""
@@ -52,87 +58,18 @@ with st.sidebar.expander("💡 Financial Health Guidelines"):
     - Good credit history
     """)
 
-st.sidebar.subheader("Income & Debt")
-annual_income = st.sidebar.number_input(
-    "Annual Gross Income ($)",
-    min_value=20000,
-    max_value=1000000,
-    value=96000,
-    step=5000,
-    help="Your total annual income before taxes"
-)
-
+# Extract values from health_params
+annual_income = health_params['annual_income']
 monthly_income = annual_income / 12
-
-monthly_debts = st.sidebar.number_input(
-    "Monthly Debt Payments ($)",
-    min_value=0,
-    max_value=20000,
-    value=500,
-    step=100,
-    help="Car loans, credit cards, student loans, etc. (monthly payments)"
-)
-
-st.sidebar.subheader("Net Worth Breakdown")
-cash_savings = st.sidebar.number_input(
-    "Cash Savings ($)",
-    min_value=0,
-    max_value=2000000,
-    value=150000,
-    step=10000,
-    help="Liquid cash available (savings, checking, CDs)"
-)
-
-stock_investments = st.sidebar.number_input(
-    "Stock/Investment Portfolio ($)",
-    min_value=0,
-    max_value=5000000,
-    value=100000,
-    step=10000,
-    help="Stocks, bonds, 401k, IRA, etc."
-)
+monthly_debts = health_params['monthly_debts']
+cash_savings = health_params['cash_savings']
+stock_investments = health_params['stock_investments']
+target_home_price = health_params['target_home_price']
+target_down_payment = health_params['target_down_payment']
+mortgage_rate = health_params['mortgage_rate']
+emergency_fund = health_params.get('emergency_fund', 50000)  # Fallback if not in health_params
 
 total_net_worth = cash_savings + stock_investments
-
-st.sidebar.subheader("Target Home Details")
-target_home_price = st.sidebar.slider(
-    "Target Home Price ($)",
-    min_value=100000,
-    max_value=2000000,
-    value=500000,
-    step=10000,
-    format="$%d",
-    help="Home price you're considering"
-)
-
-target_down_payment = st.sidebar.slider(
-    "Planned Down Payment ($)",
-    min_value=20000,
-    max_value=target_home_price,
-    value=min(100000, target_home_price),
-    step=10000,
-    format="$%d",
-    help="Amount you plan to put down"
-)
-
-mortgage_rate = st.sidebar.slider(
-    "Expected Mortgage Rate (%)",
-    min_value=3.0,
-    max_value=10.0,
-    value=6.1,
-    step=0.1,
-    format="%.1f%%",
-    help="Current 30-year mortgage rates"
-) / 100
-
-emergency_fund = st.sidebar.number_input(
-    "Emergency Fund ($)",
-    min_value=0,
-    max_value=200000,
-    value=50000,
-    step=5000,
-    help="Amount set aside for emergencies"
-)
 
 # Initialize analyzer and run analysis automatically
 analyzer = MortgageAnalyzer(home_price=target_home_price, emergency_fund=emergency_fund)
@@ -242,7 +179,7 @@ with tab1:
             color_continuous_scale='blues'
         )
         fig_payment.update_layout(showlegend=False, height=400)
-        st.plotly_chart(fig_payment, use_container_width=True)
+        st.plotly_chart(fig_payment, width='stretch')
 
     with col2:
         st.markdown("#### 🎯 Affordability Limits")
@@ -324,7 +261,7 @@ with tab2:
             height=400
         )
 
-        st.plotly_chart(fig_nw, use_container_width=True)
+        st.plotly_chart(fig_nw, width='stretch')
 
 with tab3:
     st.subheader("Personalized Recommendations")

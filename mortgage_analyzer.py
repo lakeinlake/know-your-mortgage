@@ -409,19 +409,26 @@ class MortgageAnalyzer:
         return results
 
     def calculate_break_even_analysis(self, rent_scenario: RentScenario,
-                                    buy_scenario: MortgageScenario) -> Dict:
+                                    buy_scenario: MortgageScenario,
+                                    rent_results: Dict = None,
+                                    buy_results: Dict = None) -> Dict:
         """
         Calculate when buying becomes better than renting financially.
 
         Args:
             rent_scenario: RentScenario object
             buy_scenario: MortgageScenario object to compare against
+            rent_results: Optional pre-computed rent analysis results
+            buy_results: Optional pre-computed buy analysis results
 
         Returns:
             Dictionary with break-even analysis results
         """
-        rent_results = self.analyze_rent_scenario(rent_scenario)
-        buy_results = self.analyze_scenario(buy_scenario)
+        # Use pre-computed results if provided, otherwise compute them
+        if rent_results is None:
+            rent_results = self.analyze_rent_scenario(rent_scenario)
+        if buy_results is None:
+            buy_results = self.analyze_scenario(buy_scenario)
 
         break_even_year = None
         yearly_comparison = []
@@ -443,12 +450,40 @@ class MortgageAnalyzer:
                 'buy_is_better': buy_net_worth > rent_net_worth
             })
 
+        # Calculate final net worth difference
+        final_buy_net_worth = buy_results.get('final_net_worth_adjusted', 0)
+        final_rent_net_worth = rent_results.get('final_net_worth_adjusted', 0)
+        final_net_worth_difference = final_buy_net_worth - final_rent_net_worth
+
+        # Get advantage at 30 years (same as final net worth difference for 30-year analysis)
+        advantage_at_30_years = final_net_worth_difference
+        if yearly_comparison and len(yearly_comparison) >= 30:
+            advantage_at_30_years = yearly_comparison[29]['buy_advantage']  # Year 30 (0-indexed)
+
+        # Generate insights
+        insights = []
+        if break_even_year:
+            insights.append(f"📈 Buying becomes more profitable than renting in year {break_even_year}.")
+            if break_even_year <= 5:
+                insights.append("This is a very short break-even point, suggesting buying is a strong financial choice.")
+            elif break_even_year > 10:
+                insights.append("With a longer break-even point, ensure you plan to stay in the home long enough to realize the financial benefits.")
+        else:
+            insights.append("📉 Based on this 30-year analysis, renting remains more financially advantageous.")
+
+        if final_net_worth_difference > 0:
+            insights.append(f"💰 After 30 years, buying is projected to increase your net worth by an additional ${final_net_worth_difference:,.0f} compared to renting.")
+        else:
+            insights.append(f"💸 After 30 years, renting is projected to leave you with a higher net worth by ${abs(final_net_worth_difference):,.0f}.")
+
         return {
-            'break_even_year': break_even_year,
+            'break_even_year': break_even_year if break_even_year is not None else "Never",
             'yearly_comparison': yearly_comparison,
-            'final_rent_net_worth': rent_results['final_net_worth_adjusted'],
-            'final_buy_net_worth': buy_results['final_net_worth_adjusted'],
-            'total_advantage': buy_results['final_net_worth_adjusted'] - rent_results['final_net_worth_adjusted']
+            'final_rent_net_worth': final_rent_net_worth,
+            'final_buy_net_worth': final_buy_net_worth,
+            'advantage_at_30_years': advantage_at_30_years,
+            'final_net_worth_difference': final_net_worth_difference,
+            'insights': insights
         }
 
     def create_scenarios(self, home_price: float, rate_15yr: float = 0.056,
@@ -651,6 +686,158 @@ class MortgageAnalyzer:
         stats['wealth_difference_pct'] = (stats['wealth_difference'] / stats['min_final_wealth']) * 100
 
         return stats
+
+    def run_corrected_rent_vs_buy_analysis(self, buy_scenario: MortgageScenario, rent_scenario: RentScenario) -> Dict:
+        """
+        Corrected rent vs buy analysis that properly accounts for all costs.
+
+        This method fixes the fundamental flaws in the original analysis by:
+        1. Including ALL homeownership costs (insurance, maintenance, etc.)
+        2. Properly investing monthly savings for whichever option is cheaper
+        3. Including selling costs in final calculations
+        """
+        # Initialize tracking variables
+        buy_yearly_data = []
+        rent_yearly_data = []
+
+        # Calculate initial costs
+        monthly_pi = self.calculate_monthly_payment(buy_scenario.loan_amount, buy_scenario.interest_rate, buy_scenario.term_years)
+
+        # Buyer starts with less cash due to down payment and closing costs
+        buyer_initial_cash_out = buy_scenario.down_payment + (buy_scenario.home_price * 0.03)  # 3% closing costs
+
+        # Renter invests what buyer spent on down payment + closing costs
+        rent_investment_balance = buyer_initial_cash_out
+        buy_investment_balance = 0  # Buyer's money is tied up in the house
+
+        current_rent = rent_scenario.monthly_rent
+        analysis_years = min(30, len(range(1, 31)))  # Ensure we don't exceed available data
+
+        for year in range(1, analysis_years + 1):
+            # Calculate home value for this year
+            home_value = buy_scenario.home_price * ((1 + buy_scenario.home_appreciation_rate) ** year)
+
+            # BUYER'S TOTAL MONTHLY COSTS
+            monthly_property_tax = (home_value * buy_scenario.property_tax_rate) / 12
+            monthly_insurance = home_value * 0.003 / 12  # 0.3% annually for homeowners insurance
+            monthly_maintenance = home_value * 0.01 / 12  # 1% annually for maintenance
+
+            buy_total_monthly = monthly_pi + monthly_property_tax + monthly_insurance + monthly_maintenance
+
+            # RENTER'S TOTAL MONTHLY COSTS
+            monthly_renters_insurance = rent_scenario.renters_insurance / 12
+            rent_total_monthly = current_rent + monthly_renters_insurance
+
+            # Calculate who saves money and how much
+            monthly_difference = buy_total_monthly - rent_total_monthly
+
+            # Grow existing investments
+            buy_investment_balance *= (1 + buy_scenario.stock_return_rate)
+            rent_investment_balance *= (1 + rent_scenario.stock_return_rate)
+
+            # Add annual savings to appropriate investment account
+            annual_savings = monthly_difference * 12
+            if monthly_difference > 0:
+                # Buying is more expensive, renter invests the difference
+                rent_investment_balance += annual_savings
+            else:
+                # Renting is more expensive, buyer invests the difference
+                buy_investment_balance += abs(annual_savings)
+
+            # Calculate net worth
+            # Buyer: home equity + investments
+            remaining_balance = max(0, buy_scenario.loan_amount * ((1 + buy_scenario.interest_rate/12)**(12*buy_scenario.term_years) - (1 + buy_scenario.interest_rate/12)**(12*year)) / ((1 + buy_scenario.interest_rate/12)**(12*buy_scenario.term_years) - 1)) if year <= buy_scenario.term_years else 0
+            home_equity = home_value - remaining_balance
+            buy_net_worth = home_equity + buy_investment_balance
+
+            # Renter: investments only
+            rent_net_worth = rent_investment_balance
+
+            # Adjust for inflation
+            inflation_factor = (1 + buy_scenario.inflation_rate) ** year
+            buy_net_worth_adj = buy_net_worth / inflation_factor
+            rent_net_worth_adj = rent_net_worth / inflation_factor
+
+            buy_yearly_data.append({
+                'year': year,
+                'net_worth': buy_net_worth,
+                'net_worth_adjusted': buy_net_worth_adj
+            })
+
+            rent_yearly_data.append({
+                'year': year,
+                'net_worth': rent_net_worth,
+                'net_worth_adjusted': rent_net_worth_adj
+            })
+
+            # Update rent for next year
+            current_rent *= (1 + rent_scenario.annual_rent_increase)
+
+        # Calculate final values with selling costs
+        final_home_value = buy_scenario.home_price * ((1 + buy_scenario.home_appreciation_rate) ** analysis_years)
+        selling_costs = final_home_value * 0.06  # 6% selling costs
+        final_home_equity = final_home_value - selling_costs
+
+        final_buy_net_worth = final_home_equity + buy_investment_balance
+        final_buy_net_worth_adj = final_buy_net_worth / ((1 + buy_scenario.inflation_rate) ** analysis_years)
+
+        final_rent_net_worth_adj = rent_yearly_data[-1]['net_worth_adjusted'] if rent_yearly_data else 0
+
+        # Find break-even year
+        break_even_year = "Never"
+        for i, (buy_data, rent_data) in enumerate(zip(buy_yearly_data, rent_yearly_data)):
+            if buy_data['net_worth_adjusted'] > rent_data['net_worth_adjusted']:
+                break_even_year = i + 1
+                break
+
+        # Generate insights
+        insights = []
+        advantage_at_30_years = final_buy_net_worth_adj - final_rent_net_worth_adj
+
+        if break_even_year != "Never":
+            insights.append(f"📈 Buying becomes more profitable than renting in year {break_even_year}.")
+            if break_even_year <= 5:
+                insights.append("This is a short break-even point, suggesting buying is a strong financial choice.")
+            elif break_even_year > 10:
+                insights.append("With a longer break-even point, ensure you plan to stay long enough to realize the benefits.")
+        else:
+            insights.append("📉 Based on this analysis, renting remains more financially advantageous over 30 years.")
+
+        if advantage_at_30_years > 0:
+            insights.append(f"💰 After 30 years, buying is projected to increase your net worth by ${advantage_at_30_years:,.0f} compared to renting.")
+        else:
+            insights.append(f"💸 After 30 years, renting is projected to leave you with ${abs(advantage_at_30_years):,.0f} more net worth.")
+
+        return {
+            'buy_results': {
+                'yearly_data': buy_yearly_data,
+                'final_net_worth_adjusted': final_buy_net_worth_adj,
+                'monthly_payment': monthly_pi
+            },
+            'rent_results': {
+                'yearly_data': rent_yearly_data,
+                'final_net_worth_adjusted': final_rent_net_worth_adj,
+                'total_rent_paid': sum(rent_scenario.monthly_rent * ((1 + rent_scenario.annual_rent_increase) ** (year-1)) * 12 for year in range(1, analysis_years + 1))
+            },
+            'break_even_analysis': {
+                'break_even_year': break_even_year,
+                'yearly_comparison': [
+                    {
+                        'year': i + 1,
+                        'rent_net_worth': rent_data['net_worth_adjusted'],
+                        'buy_net_worth': buy_data['net_worth_adjusted'],
+                        'buy_advantage': buy_data['net_worth_adjusted'] - rent_data['net_worth_adjusted'],
+                        'buy_is_better': buy_data['net_worth_adjusted'] > rent_data['net_worth_adjusted']
+                    }
+                    for i, (buy_data, rent_data) in enumerate(zip(buy_yearly_data, rent_yearly_data))
+                ],
+                'final_rent_net_worth': final_rent_net_worth_adj,
+                'final_buy_net_worth': final_buy_net_worth_adj,
+                'advantage_at_30_years': advantage_at_30_years,
+                'final_net_worth_difference': advantage_at_30_years,
+                'insights': insights
+            }
+        }
 
 
 class GoogleSheetsExporter:
@@ -1015,3 +1202,4 @@ class GoogleSheetsExporter:
                 f"{scenario.tax_rate:.2%}"
             ]])
             row += 1
+

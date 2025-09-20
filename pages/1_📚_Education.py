@@ -3,7 +3,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.shared_components import apply_custom_css, show_golden_rules, show_glossary
+from src.utils.shared_components import apply_custom_css, show_golden_rules, show_glossary
+from src.utils.state_manager import AppState
 
 st.set_page_config(
     page_title="Education - Know Your Mortgage",
@@ -13,6 +14,9 @@ st.set_page_config(
 )
 
 apply_custom_css()
+
+# Initialize session state for consistency
+AppState.initialize()
 
 st.markdown('<h1 class="main-header">📚 First-Time Home Buyer Education</h1>', unsafe_allow_html=True)
 

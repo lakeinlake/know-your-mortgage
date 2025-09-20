@@ -1,5 +1,6 @@
 import streamlit as st
-from utils.shared_components import apply_custom_css
+from src.utils.shared_components import apply_custom_css
+from src.utils.state_manager import AppState
 
 st.set_page_config(
     page_title="Know Your Mortgage - Home",
@@ -9,6 +10,9 @@ st.set_page_config(
 )
 
 apply_custom_css()
+
+# Initialize session state for consistency across app
+AppState.initialize()
 
 st.markdown('<h1 class="main-header">🏠 Know Your Mortgage</h1>', unsafe_allow_html=True)
 st.markdown('<h3 style="text-align: center; color: #666; margin-bottom: 2rem;">Your Complete Financial Education Platform for Smart Home Buying</h3>', unsafe_allow_html=True)

@@ -7,7 +7,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mortgage_analyzer import MortgageAnalyzer, MortgageScenario, RentScenario
-from utils.shared_components import apply_custom_css, check_pmi_requirement, calculate_recommended_emergency_fund, add_tax_selection_sidebar
+from src.utils.shared_components import apply_custom_css, check_pmi_requirement, calculate_recommended_emergency_fund
+from src.utils.state_manager import initialize, AppState
+from src.utils.ui_components import create_tax_sidebar, create_common_sidebar, create_rent_sidebar
 
 st.set_page_config(
     page_title="Rent vs Buy - Know Your Mortgage",
@@ -17,6 +19,9 @@ st.set_page_config(
 )
 
 apply_custom_css()
+
+# 1. Initialize state
+initialize()
 
 st.markdown('<h1 class="main-header">🏢 Rent vs Buy Analysis</h1>', unsafe_allow_html=True)
 
@@ -28,20 +33,29 @@ and long-term wealth building potential.
 
 st.sidebar.header("🏢 Rent vs Buy Parameters")
 
-# State and tax selection
-selected_state, tax_rate, property_tax_rate = add_tax_selection_sidebar()
+# 2. Render UI and get computed values directly
+selected_state, tax_rate, property_tax_rate = create_tax_sidebar()
+params = create_common_sidebar()
+rent_params = create_rent_sidebar()
 
-# Sidebar inputs
-home_price = st.sidebar.slider("Home Price ($)", 100000, 2000000, 500000, 10000, format="$%d")
-down_payment = st.sidebar.slider("Down Payment ($)", 20000, home_price, min(100000, home_price), 10000, format="$%d")
-monthly_rent = st.sidebar.slider("Monthly Rent ($)", 500, int(home_price * 0.01), int(home_price * 0.005), 100, format="$%d")
-rent_increase = st.sidebar.slider("Annual Rent Increase (%)", 0.0, 10.0, 3.0, 0.5, format="%.1f%%") / 100
-renters_insurance = st.sidebar.slider("Annual Renters Insurance ($)", 0, 1000, 200, 50, format="$%d")
-rate_30yr = st.sidebar.slider("30-Year Mortgage Rate (%)", 3.0, 10.0, 6.1, 0.1, format="%.1f%%") / 100
-stock_return = st.sidebar.slider("Stock Market Return (%)", 0.0, 15.0, 8.0, 0.5, format="%.1f%%") / 100
-inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 10.0, 3.0, 0.5, format="%.1f%%") / 100
-home_appreciation = st.sidebar.slider("Home Appreciation (%)", 0.0, 10.0, 5.0, 0.5, format="%.1f%%") / 100
-emergency_fund = st.sidebar.number_input("Emergency Fund ($)", 0, 200000, 50000, 5000)
+home_price = params['home_price']
+down_payment = params['down_payment_1']
+rate_30yr = params['rate_30yr']
+stock_return = params['stock_return']
+inflation_rate = params['inflation_rate']
+home_appreciation = params['home_appreciation']
+emergency_fund = params['emergency_fund']
+
+monthly_rent = rent_params['monthly_rent']
+rent_increase = rent_params['rent_increase']
+renters_insurance = rent_params['renters_insurance']
+
+# PMI warnings for down payment
+pmi_required_1, monthly_pmi_1, ltv_1 = check_pmi_requirement(home_price, down_payment)
+if pmi_required_1:
+    st.sidebar.warning(f"⚠️ PMI Required: ~${monthly_pmi_1:.0f}/month (LTV: {ltv_1:.1%})")
+else:
+    st.sidebar.success(f"✅ No PMI needed (LTV: {ltv_1:.1%})")
 
 # Initialize analyzer
 analyzer = MortgageAnalyzer(home_price=home_price, emergency_fund=emergency_fund)
@@ -76,10 +90,40 @@ rent_scenario = RentScenario(
     emergency_fund=emergency_fund
 )
 
-# Analyze scenarios - NOTE: different method call order than expected
-rent_results = analyzer.analyze_rent_scenario(rent_scenario)
-buy_results = analyzer.analyze_scenario(buy_scenario)
-break_even_analysis = analyzer.calculate_break_even_analysis(rent_scenario, buy_scenario)
+# Analyze scenarios using corrected method
+corrected_results = analyzer.run_corrected_rent_vs_buy_analysis(buy_scenario, rent_scenario)
+
+# Extract individual results for backward compatibility with existing chart code
+rent_results = corrected_results.get('rent_results', {})
+buy_results = corrected_results.get('buy_results', {})
+break_even_analysis = corrected_results.get('break_even_analysis', {})
+
+# Debug information
+with st.expander("🐞 Debug Information", expanded=False):
+    st.write("### Analysis Parameters")
+    col_debug1, col_debug2 = st.columns(2)
+    with col_debug1:
+        st.write("**Buy Scenario:**")
+        st.write(f"- Home Price: ${home_price:,}")
+        st.write(f"- Down Payment: ${down_payment:,}")
+        st.write(f"- Monthly Payment: ${buy_results.get('monthly_payment', 0):,.0f}")
+        st.write(f"- Interest Rate: {rate_30yr:.1%}")
+        st.write(f"- Property Tax: {property_tax_rate:.2%}")
+    with col_debug2:
+        st.write("**Rent Scenario:**")
+        st.write(f"- Monthly Rent: ${monthly_rent:,}")
+        st.write(f"- Rent Increase: {rent_increase:.1%}")
+        st.write(f"- Down Payment Invested: ${down_payment:,}")
+        st.write(f"- Stock Return: {stock_return:.1%}")
+
+    st.write("### Break-even Analysis Results")
+    st.json(break_even_analysis)
+
+    if 'yearly_comparison' in break_even_analysis and break_even_analysis['yearly_comparison']:
+        st.write("### First 5 Years Comparison")
+        yearly_data = break_even_analysis['yearly_comparison'][:5]
+        df_debug = pd.DataFrame(yearly_data)
+        st.dataframe(df_debug)
 
 # Display results
 st.markdown('<h2 class="sub-header">🏠 vs 🏢 Rent vs Buy Analysis</h2>', unsafe_allow_html=True)
@@ -105,37 +149,57 @@ with col3:
               help="Buy minus Rent net worth at year 30")
 
 # Chart
-st.subheader("Buy vs Rent Comparison Over Time")
+st.subheader("Buy vs Rent Financial Advantage Over Time")
 
 years = list(range(1, 31))
 fig_comparison = go.Figure()
 
-# Extract net worth data correctly
-if 'yearly_data' in buy_results:
+# Calculate net worth difference (Buy - Rent) to show break-even clearly
+if 'yearly_data' in buy_results and 'yearly_data' in rent_results:
     buy_net_worth = [d['net_worth_adjusted'] for d in buy_results['yearly_data']]
-    fig_comparison.add_trace(go.Scatter(
-        x=years, y=buy_net_worth, mode='lines',
-        name='Buy (Real Net Worth)', line=dict(color='green', width=3)
-    ))
-
-if 'yearly_data' in rent_results:
     rent_net_worth = [d['net_worth_adjusted'] for d in rent_results['yearly_data']]
+
+    # Calculate the difference: positive means buying is better, negative means renting is better
+    net_worth_difference = [buy - rent for buy, rent in zip(buy_net_worth, rent_net_worth)]
+
+    # Create the differential plot
     fig_comparison.add_trace(go.Scatter(
-        x=years, y=rent_net_worth, mode='lines',
-        name='Rent (Real Net Worth)', line=dict(color='blue', width=3)
+        x=years, y=net_worth_difference, mode='lines+markers',
+        name='Buy Advantage Over Rent',
+        line=dict(color='purple', width=3),
+        marker=dict(size=4),
+        fill='tonexty' if any(diff < 0 for diff in net_worth_difference) else None,
+        fillcolor='rgba(255,0,0,0.1)' if any(diff < 0 for diff in net_worth_difference) else 'rgba(0,255,0,0.1)',
+        hovertemplate='<b>Year %{x}</b><br>' +
+                      'Net Worth Advantage: $%{y:,.0f}<br>' +
+                      '<i>%{customdata}</i><extra></extra>',
+        customdata=['Buying is better' if diff > 0 else 'Renting is better' if diff < 0 else 'Break-even point'
+                   for diff in net_worth_difference]
     ))
 
+    # Add zero line for reference
+    fig_comparison.add_hline(y=0, line_dash="solid", line_color="gray", line_width=1,
+                           annotation_text="Break-even line", annotation_position="bottom right")
+
+# Add break-even year marker if it exists
 if isinstance(break_even_year, (int, float)) and 1 <= break_even_year <= 30:
-    fig_comparison.add_vline(x=break_even_year, line_dash="dash", line_color="red",
+    fig_comparison.add_vline(x=break_even_year, line_dash="dash", line_color="red", line_width=2,
                            annotation_text=f"Break-even: Year {break_even_year:.0f}")
 
 fig_comparison.update_layout(
-    title="Rent vs Buy: Net Worth Comparison Over Time",
-    xaxis_title="Years", yaxis_title="Real Net Worth ($)",
-    hovermode='x unified', height=500
+    title="Financial Advantage: Buy vs Rent Over Time",
+    xaxis_title="Years",
+    yaxis_title="Net Worth Advantage of Buying ($)",
+    hovermode='x unified',
+    height=500,
+    annotations=[
+        dict(x=0.02, y=0.98, xref="paper", yref="paper",
+             text="📈 Above zero: Buying is better<br>📉 Below zero: Renting is better",
+             showarrow=False, font=dict(size=10), bgcolor="rgba(255,255,255,0.8)")
+    ]
 )
 
-st.plotly_chart(fig_comparison, use_container_width=True)
+st.plotly_chart(fig_comparison, width='stretch')
 
 # Insights
 insights = break_even_analysis.get('insights', [])
@@ -173,7 +237,7 @@ with tab1:
         ]
     }
     df_comparison = pd.DataFrame(comparison_data)
-    st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+    st.dataframe(df_comparison, width='stretch', hide_index=True)
 
 with tab2:
     st.subheader("Rent Analysis Details")
@@ -201,7 +265,7 @@ with tab2:
     df_rent = pd.DataFrame(rent_data)
     fig_rent = px.line(df_rent, x='Year', y='Monthly Rent', title='Monthly Rent Escalation Over Time')
     fig_rent.update_layout(height=400)
-    st.plotly_chart(fig_rent, use_container_width=True)
+    st.plotly_chart(fig_rent, width='stretch')
 
 with tab3:
     st.subheader("Cash Flow Analysis")
@@ -220,7 +284,7 @@ with tab3:
     fig_cashflow.add_trace(go.Scatter(x=years, y=rent_monthly, mode='lines', name='Rent: Monthly Payment', line=dict(color='blue')))
 
     fig_cashflow.update_layout(title="Monthly Payment Comparison Over Time", xaxis_title="Years", yaxis_title="Monthly Payment ($)", hovermode='x unified')
-    st.plotly_chart(fig_cashflow, use_container_width=True)
+    st.plotly_chart(fig_cashflow, width='stretch')
 
 st.markdown("---")
 st.markdown("💡 **Next Steps:** Check your financial readiness on the Financial Health page or generate professional reports for detailed planning.")

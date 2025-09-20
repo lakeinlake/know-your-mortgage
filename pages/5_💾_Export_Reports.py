@@ -6,7 +6,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mortgage_analyzer import MortgageAnalyzer, MortgageScenario, RentScenario
-from utils.shared_components import apply_custom_css, add_tax_selection_sidebar
+from src.utils.shared_components import apply_custom_css
+from src.utils.state_manager import initialize, AppState
+from src.utils.ui_components import create_tax_sidebar, create_common_sidebar
 
 st.set_page_config(
     page_title="Export Reports - Know Your Mortgage",
@@ -16,6 +18,9 @@ st.set_page_config(
 )
 
 apply_custom_css()
+
+# 1. Initialize state
+initialize()
 
 st.markdown('<h1 class="main-header">💾 Export Reports & Data</h1>', unsafe_allow_html=True)
 
@@ -28,73 +33,53 @@ st.info("⚠️ **Note:** You need to run analysis on other pages first to gener
 
 st.sidebar.header("📊 Export Configuration")
 
-# State and tax selection
-selected_state, tax_rate, property_tax_rate = add_tax_selection_sidebar()
+# 2. Render UI and get computed values directly
+selected_state, tax_rate, property_tax_rate = create_tax_sidebar()
+params = create_common_sidebar()
+home_price = params['home_price']
+down_payment_1 = params['down_payment_1']
+down_payment_2 = params['down_payment_2']
+rate_30yr = params['rate_30yr']
+rate_15yr = params['rate_15yr']
+stock_return = params['stock_return']
+inflation_rate = params['inflation_rate']
+home_appreciation = params['home_appreciation']
+emergency_fund = params['emergency_fund']
 
-st.sidebar.subheader("Analysis Parameters")
-home_price = st.sidebar.slider(
-    "Home Price ($)",
-    min_value=100000,
-    max_value=2000000,
-    value=500000,
-    step=10000,
-    format="$%d"
-)
-
-down_payment_1 = st.sidebar.slider(
-    "Down Payment Option 1 ($)",
-    min_value=20000,
-    max_value=home_price,
-    value=min(100000, home_price),
-    step=10000,
-    format="$%d"
-)
-
-down_payment_2 = st.sidebar.slider(
-    "Down Payment Option 2 ($)",
-    min_value=20000,
-    max_value=home_price,
-    value=min(200000, home_price),
-    step=10000,
-    format="$%d"
-)
-
-include_rent_analysis = st.sidebar.checkbox("Include Rent vs Buy Analysis", value=True)
+include_rent_analysis = st.sidebar.checkbox("Include Rent vs Buy Analysis", value=True, key="include_rent_analysis")
 
 if include_rent_analysis:
+    st.sidebar.subheader("🏢 Rental Parameters")
     monthly_rent = st.sidebar.slider(
         "Monthly Rent ($)",
         min_value=500,
         max_value=int(home_price * 0.01),
-        value=int(home_price * 0.005),
+        value=st.session_state.monthly_rent,
         step=100,
-        format="$%d"
+        format="$%d",
+        key="monthly_rent"
     )
 
     rent_increase = st.sidebar.slider(
         "Annual Rent Increase (%)",
         min_value=0.0,
         max_value=10.0,
-        value=3.0,
+        value=st.session_state.rent_increase * 100,
         step=0.5,
-        format="%.1f%%"
+        format="%.1f%%",
+        key="rent_increase_pct"
     ) / 100
 
     renters_insurance = st.sidebar.slider(
         "Annual Renters Insurance ($)",
         min_value=0,
         max_value=1000,
-        value=200,
+        value=st.session_state.renters_insurance,
         step=50,
-        format="$%d"
+        format="$%d",
+        key="renters_insurance"
     )
 
-rate_30yr = st.sidebar.slider("30-Year Rate (%)", 3.0, 10.0, 6.1, 0.1) / 100
-rate_15yr = st.sidebar.slider("15-Year Rate (%)", 3.0, 10.0, 5.6, 0.1) / 100
-stock_return = st.sidebar.slider("Stock Market Return (%)", 0.0, 15.0, 8.0, 0.5) / 100
-inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 10.0, 3.0, 0.5) / 100
-home_appreciation = st.sidebar.slider("Home Appreciation (%)", 0.0, 10.0, 5.0, 0.5) / 100
-emergency_fund = st.sidebar.number_input("Emergency Fund ($)", 0, 200000, 50000, 5000)
 
 # Generate analysis data automatically
 analyzer = MortgageAnalyzer(home_price=home_price, emergency_fund=emergency_fund)
@@ -492,7 +477,7 @@ if st.checkbox("Show Summary Data Preview"):
 
     if summary_data:
         summary_df = pd.DataFrame(summary_data)
-        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        st.dataframe(summary_df, width='stretch', hide_index=True)
 
 st.markdown("---")
 st.markdown("### 📖 Export Tips")

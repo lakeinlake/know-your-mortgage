@@ -7,7 +7,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mortgage_analyzer import MortgageAnalyzer, MortgageScenario
-from utils.shared_components import apply_custom_css, check_pmi_requirement, calculate_recommended_emergency_fund, add_tax_selection_sidebar
+from src.utils.shared_components import apply_custom_css, check_pmi_requirement, calculate_recommended_emergency_fund
+from src.utils.state_manager import initialize, AppState
+from src.utils.ui_components import create_tax_sidebar, create_common_sidebar
 
 st.set_page_config(
     page_title="Mortgage Analysis - Know Your Mortgage",
@@ -18,6 +20,9 @@ st.set_page_config(
 
 apply_custom_css()
 
+# 1. Initialize state
+initialize()
+
 st.markdown('<h1 class="main-header">🏠 Mortgage Scenario Analysis</h1>', unsafe_allow_html=True)
 
 st.markdown("""
@@ -27,13 +32,12 @@ different down payment strategies, and cash purchase options to find the best ap
 
 st.sidebar.header("📊 Mortgage Parameters")
 
-# State and tax selection
-selected_state, tax_rate, property_tax_rate = add_tax_selection_sidebar()
-
-# Sidebar inputs
-home_price = st.sidebar.slider("Home Price ($)", 100000, 2000000, 500000, 10000, format="$%d")
-down_payment_100k = st.sidebar.slider("Down Payment Option 1 ($)", 20000, home_price, min(100000, home_price), 10000, format="$%d")
-down_payment_200k = st.sidebar.slider("Down Payment Option 2 ($)", 20000, home_price, min(200000, home_price), 10000, format="$%d")
+# 2. Render UI and get computed values directly
+selected_state, tax_rate, property_tax_rate = create_tax_sidebar()
+params = create_common_sidebar()
+home_price = params['home_price']
+down_payment_100k = params['down_payment_1']
+down_payment_200k = params['down_payment_2']
 
 # PMI warnings
 pmi_required_1, monthly_pmi_1, ltv_1 = check_pmi_requirement(home_price, down_payment_100k)
@@ -48,12 +52,12 @@ if pmi_required_2:
 else:
     st.sidebar.success(f"✅ No PMI needed (LTV: {ltv_2:.1%})")
 
-rate_30yr = st.sidebar.slider("30-Year Rate (%)", 3.0, 10.0, 6.1, 0.1, format="%.1f%%") / 100
-rate_15yr = st.sidebar.slider("15-Year Rate (%)", 3.0, 10.0, 5.6, 0.1, format="%.1f%%") / 100
-stock_return = st.sidebar.slider("Stock Market Return (%)", 0.0, 15.0, 8.0, 0.5, format="%.1f%%") / 100
-inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 10.0, 3.0, 0.5, format="%.1f%%") / 100
-home_appreciation = st.sidebar.slider("Home Appreciation (%)", 0.0, 10.0, 5.0, 0.5, format="%.1f%%") / 100
-emergency_fund = st.sidebar.number_input("Emergency Fund ($)", 0, 200000, 50000, 5000)
+rate_30yr = params['rate_30yr']
+rate_15yr = params['rate_15yr']
+stock_return = params['stock_return']
+inflation_rate = params['inflation_rate']
+home_appreciation = params['home_appreciation']
+emergency_fund = params['emergency_fund']
 
 # Initialize analyzer
 analyzer = MortgageAnalyzer(home_price=home_price, emergency_fund=emergency_fund)
