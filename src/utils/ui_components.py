@@ -145,6 +145,62 @@ class UIComponents:
 
         return AppState.get_financial_health_params()
 
+    @staticmethod
+    def create_market_comparison_sidebar():
+        """Create market comparison sidebar parameters"""
+        st.sidebar.subheader("🏘️ Market Analysis Options")
+
+        # City selection
+        city = st.sidebar.selectbox(
+            "Select City",
+            options=["Both Cities", "Carmel", "Fishers"],
+            index=["Both Cities", "Carmel", "Fishers"].index(SafeSessionState.get('selected_city')),
+            key="selected_city"
+        )
+
+        # Property type selection
+        property_type = st.sidebar.selectbox(
+            "Property Type",
+            options=["Both Types", "Single Family", "Townhouse"],
+            index=["Both Types", "Single Family", "Townhouse"].index(SafeSessionState.get('property_type')),
+            key="property_type"
+        )
+
+        # Metric selection
+        metric = st.sidebar.selectbox(
+            "Primary Metric",
+            options=["Median Price", "Price per Sq Ft", "Days on Market", "Inventory", "Rental Yield"],
+            index=["Median Price", "Price per Sq Ft", "Days on Market", "Inventory", "Rental Yield"].index(SafeSessionState.get('selected_metric')),
+            key="selected_metric"
+        )
+
+        # Analysis type
+        analysis_type = st.sidebar.selectbox(
+            "Analysis Focus",
+            options=["Price Trends", "Demographics", "Investment Returns", "Market Timing"],
+            index=["Price Trends", "Demographics", "Investment Returns", "Market Timing"].index(SafeSessionState.get('analysis_type')),
+            key="analysis_type"
+        )
+
+        st.sidebar.subheader("📊 Display Options")
+
+        # Time range
+        time_range = st.sidebar.selectbox(
+            "Time Period",
+            options=["Historical (2019-2024)", "Projections (2025-2030)", "Complete (2019-2030)"],
+            index=["Historical (2019-2024)", "Projections (2025-2030)", "Complete (2019-2030)"].index(SafeSessionState.get('time_range')),
+            key="time_range"
+        )
+
+        # Show correlations
+        show_correlations = st.sidebar.checkbox(
+            "Show Demographic Correlations",
+            value=SafeSessionState.get('show_correlations'),
+            key="show_correlations"
+        )
+
+        return AppState.get_market_comparison_params()
+
 
 # Direct access to UI components
 def create_tax_sidebar():
@@ -162,3 +218,7 @@ def create_rent_sidebar():
 def create_financial_health_sidebar():
     """Create financial health sidebar parameters"""
     return UIComponents.create_financial_health_sidebar()
+
+def create_market_comparison_sidebar():
+    """Create market comparison sidebar parameters"""
+    return UIComponents.create_market_comparison_sidebar()

@@ -82,6 +82,7 @@ with col2:
     - 📚 Education center
     - 🏠 Mortgage analysis
     - 🏢 Rent vs buy comparison
+    - 🏘️ Market comparison (Carmel vs Fishers)
     - 📊 Financial health check
     - 💾 Professional reports
     """)
@@ -90,7 +91,7 @@ st.markdown("---")
 
 st.markdown("### 📱 Platform Features")
 
-tab1, tab2, tab3, tab4 = st.tabs(["🎓 Education", "🏠 Mortgage Analysis", "🏢 Rent vs Buy", "📊 Financial Health"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎓 Education", "🏠 Mortgage Analysis", "🏢 Rent vs Buy", "🏘️ Market Analysis", "📊 Financial Health"])
 
 with tab1:
     col1, col2 = st.columns(2)
@@ -205,6 +206,43 @@ with tab3:
         """)
 
 with tab4:
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("""
+        #### 🏘️ Real Estate Market Analysis
+
+        **Carmel vs Fishers Comparison:**
+        - Historical housing price trends (2019-2024)
+        - Future market projections (2025-2030)
+        - Single-family vs townhouse analysis
+        - Investment performance metrics
+
+        **Demographic Integration:**
+        - Population growth impact on prices
+        - Median income vs affordability ratios
+        - School district rating correlations
+        - Employment growth indicators
+        """)
+
+    with col2:
+        st.markdown("""
+        #### 📈 Investment Intelligence
+
+        **Market Timing Analysis:**
+        - Optimal buying windows
+        - Market cycle positioning
+        - Risk vs opportunity assessment
+        - Long-term appreciation forecasts
+
+        **Data-Driven Insights:**
+        - Rental yield comparisons
+        - Price-to-income affordability metrics
+        - Economic driver analysis
+        - Professional investment recommendations
+        """)
+
+with tab5:
     col1, col2 = st.columns(2)
 
     with col1:
@@ -339,6 +377,7 @@ with col2:
     #### 🔧 **Analysis Tools**
     - [Mortgage Comparison](🏠_Mortgage_Analysis)
     - [Rent vs Buy Analysis](🏢_Rent_vs_Buy)
+    - [Market Comparison](🏘️_Market_Comparison)
     - [Financial Health Check](📊_Financial_Health)
     - [Professional Reports](💾_Export_Reports)
     """)

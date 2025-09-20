@@ -44,7 +44,15 @@ class SafeSessionState:
         'stock_investments': 100000,
         'target_home_price': 500000,
         'target_down_payment': 100000,
-        'mortgage_rate': 6.1
+        'mortgage_rate': 6.1,
+
+        # Market Comparison parameters
+        'selected_city': "Both Cities",
+        'property_type': "Both Types",
+        'selected_metric': "Median Price",
+        'analysis_type': "Price Trends",
+        'time_range': "Historical (2019-2024)",
+        'show_correlations': False
     }
 
     @classmethod
@@ -125,6 +133,18 @@ class AppState:
             'target_home_price': SafeSessionState.get('target_home_price'),
             'target_down_payment': SafeSessionState.get('target_down_payment'),
             'mortgage_rate': SafeSessionState.get('mortgage_rate') / 100
+        }
+
+    @staticmethod
+    def get_market_comparison_params():
+        """Get market comparison parameters"""
+        return {
+            'selected_city': SafeSessionState.get('selected_city'),
+            'property_type': SafeSessionState.get('property_type'),
+            'selected_metric': SafeSessionState.get('selected_metric'),
+            'analysis_type': SafeSessionState.get('analysis_type'),
+            'time_range': SafeSessionState.get('time_range'),
+            'show_correlations': SafeSessionState.get('show_correlations')
         }
 
 
