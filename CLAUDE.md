@@ -1,7 +1,22 @@
 # Know Your Mortgage - Claude Code Instructions
 
+## 🚀 Version 2.4.0 - Census API Integration & Debugging (September 24, 2025)
+
+### ✅ **Technical Summary: Census API Debugging**
+- **Problem**: API calls returned `204 No Content` despite valid API key configuration.
+- **Root Causes**:
+  1. **Flawed Key Loading**: `if "streamlit" in globals()` logic failed in non-Streamlit test environments.
+  2. **Incorrect FIPS Codes**: Used wrong county codes (e.g., `10588` for Carmel instead of `10342`).
+- **Solutions**:
+  1. **Robust Key Function**: Implemented `_load_census_api_key()` with fallback chain (Streamlit secrets → environment variables → local file).
+  2. **Corrected FIPS**: Updated all files with correct FIPS codes for Carmel (`10342`) and Fishers (`23278`).
+- **Result**: Successfully fetched real-time population and income data from the Census API.
+- **Verification**: Carmel (Pop: 99,453, Income: $132,859), Fishers (Pop: 99,041, Income: $126,548)
+
+---
+
 ## Project Overview
-**Version 2.3.0** - Comprehensive financial education platform with corrected rent vs buy analysis.
+**Version 2.4.0** - Comprehensive financial education platform with corrected rent vs buy analysis and working Census API integration.
 
 **What it does:**
 - Compares mortgage scenarios (15-year, 30-year, cash purchase)
@@ -25,6 +40,7 @@
 - **NEW:** `src/utils/state_manager.py` - Pure state management (`SafeSessionState` + `AppState`)
 - **NEW:** `src/utils/ui_components.py` - Centralized UI rendering logic (`UIComponents` class)
 - **NEW:** `src/data/tax_data.py` - Static data storage for taxes and state info
+- **NEW:** `src/data/census_api.py` - Census API integration with robust key loading and real demographic data
 - `src/utils/shared_components.py` - Shared business logic and utility functions
 - `mortgage_analyzer.py` - Core calculation engine (40K+ lines, advanced modeling)
 - `app.py` - Clean deployment entry point

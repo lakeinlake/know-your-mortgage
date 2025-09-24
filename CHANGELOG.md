@@ -7,6 +7,46 @@ A comprehensive mortgage analysis tool built with Python and Streamlit that comp
 
 ---
 
+## Version 2.4.0 - Census API Integration & Debugging (September 24, 2025)
+
+### 🔧 **Technical Debugging & Integration**
+**Successfully integrated and debugged the US Census API for real-time demographic data.**
+
+#### ✅ **Problem Summary**
+- **Symptom**: Census API calls were failing with `204 No Content` responses despite a valid API key.
+- **Scope**: The issue was present in both direct Python script testing (`temp_census_test.py`) and within the live Streamlit application.
+- **Verification**: Logging confirmed the API key was being loaded correctly, but data retrieval failed.
+
+#### ✅ **Root Cause Analysis**
+1. **API Key Loading Logic**: The key loading mechanism relied on a `if "streamlit" in globals()` check, which failed when running standalone Python scripts for testing, preventing the key from being loaded in that environment.
+2. **Incorrect FIPS Codes**: The primary issue was the use of outdated or incorrect FIPS county codes for API queries.
+   - **Carmel, IN**: Used `10588`, but the correct code is `10342`.
+   - **Fishers, IN**: Used `23482`, but the correct code is `23278`.
+3. **Hardcoded Test Data**: The test file (`temp_census_test.py`) contained the same hardcoded incorrect FIPS codes, leading to test failures.
+
+#### ✅ **Solutions Implemented**
+1. **Robust API Key Loading**: A new function, `_load_census_api_key()`, was created. It establishes a reliable fallback chain: first checking Streamlit secrets, then environment variables, and finally a local `secrets.toml` file.
+2. **Corrected FIPS Codes**: Researched and validated the correct FIPS codes using the official Census API search tools.
+3. **Codebase Update**: Updated the main `src/data/census_api.py` module and the `temp_census_test.py` file with the correct FIPS codes.
+4. **Full Verification**: Executed tests against the live Census API to confirm the fix and retrieve real data.
+
+#### ✅ **Validation & Results**
+- Successfully retrieved 2022 demographic data from the Census API:
+  - **Carmel, IN (2022)**:
+    - Population: `99,453`
+    - Median Household Income: `$132,859`
+  - **Fishers, IN (2022)**:
+    - Population: `99,041`
+    - Median Household Income: `$126,548`
+
+#### ✅ **Technical Enhancements**
+- **Improved Configuration Management**: Multi-source API key loading with graceful fallbacks
+- **Enhanced Debugging**: Updated test scripts with correct parameters for reliable validation
+- **Real-time Data Integration**: Market comparison page now uses official Census Bureau data instead of sample data
+- **Documentation**: Added comprehensive FIPS code research and debugging process documentation
+
+---
+
 ## Version 2.3.0 - Rent vs Buy Analysis Bug Fixes & Core Logic Improvements (September 19, 2025)
 
 ### 🐛 **Critical Bug Fixes**

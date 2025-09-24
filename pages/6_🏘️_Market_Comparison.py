@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.shared_components import apply_custom_css
 from src.utils.state_manager import initialize
 from src.data.market_data import get_carmel_fishers_data, get_investment_insights
+from src.data.census_api import get_demographic_data, format_demographic_data_for_charts, get_census_api_status
 
 st.set_page_config(
     page_title="Market Comparison - Know Your Mortgage",
@@ -30,7 +31,23 @@ to help you make a data-driven decision. The data presented is based on historic
 data = get_carmel_fishers_data()
 insights = get_investment_insights()
 
+# Get real Census demographic data with fallback to sample data
+census_demographic_data, data_source = get_demographic_data()
+census_demographics_df, census_projections_df, _ = format_demographic_data_for_charts(census_demographic_data, data_source)
+
+# Update data structure to use real Census data for demographics
+if not census_demographics_df.empty:
+    data['demographics'] = census_demographics_df
+if not census_projections_df.empty:
+    data['projections'] = pd.concat([data['projections'], census_projections_df], ignore_index=True).drop_duplicates(subset=['year'])
+
 st.markdown('<h2 class="sub-header">📊 Market Analysis</h2>', unsafe_allow_html=True)
+
+# Data source indicator
+if data_source == "Census API":
+    st.success(f"📊 **Data Source:** {data_source} (Real-time U.S. Census Bureau data)")
+else:
+    st.info(f"📊 **Data Source:** {data_source} (Realistic sample data based on market research)")
 
 # Create tabs for different analysis views
 tab1, tab2 = st.tabs(["📈 Housing Trends", "👥 Demographics"])
