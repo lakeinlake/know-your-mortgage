@@ -1,5 +1,34 @@
 # Know Your Mortgage - Claude Code Instructions
 
+## 🚀 Version 2.5.0 - Major Enhancement: Rent vs Buy Analysis Transformation (September 29, 2025)
+
+### ✅ **Technical Summary: Complete Rent vs Buy Analysis Overhaul**
+- **Problem**: Rent vs Buy page lacked clear decision guidance, had complex multi-state UI, and missing mathematical explanations
+- **Major Improvements**:
+  1. **Indiana-Focused Cleanup**: Removed complex 50-state UI, hardcoded Indiana tax rates (3.23% state, 0.87% property)
+  2. **"The Verdict" Decision System**: Timeline-based recommendations (buy/rent/close call) using break-even vs planned stay analysis
+  3. **Dual Buying Power Calculator**: Shows what rent can afford for both 15-year (~$220K) and 30-year (~$370K) loans
+  4. **Enhanced Mathematical Explanations**:
+     - Break-even methodology with year-by-year breakdown tables
+     - Parabolic equation analysis (`at² + bt + c`) explaining curve shape
+     - Stock return impact on curve curvature (10% = narrow, 5% = wide, 3% = linear)
+  5. **Dynamic Chart Timeline**: Smart defaults (break-even + 5 years) with user slider control
+  6. **Self-Explanatory Analysis**: Clear explanations of how "Year 2 break-even" is calculated
+
+### ✅ **New Unique Features (Not in Mortgage Analysis)**
+- **Timeline Input**: "How many years do you plan to stay?" for personalized recommendations
+- **Rent-to-Purchase Power**: "Your $2,500 rent could buy a $370K home" with detailed math
+- **5-Year Wealth Impact**: Medium-term comparison vs 30-year focus
+- **Mathematical Education**: Quadratic equation breakdown with coefficient explanations
+
+### ✅ **Technical Architecture**
+- **Removed Dependencies**: Eliminated `create_tax_sidebar()`, `create_common_sidebar()`, `create_rent_sidebar()`
+- **Enhanced Functions**: `calculate_rent_to_purchase_power()` now returns both 15-year and 30-year results
+- **Smart Calculations**: Dynamic chart range, break-even explanation with user parameters
+- **Gemini Validation**: Rent-to-purchase formula mathematically verified, caveats properly contextualized
+
+---
+
 ## 🚀 Version 2.4.1 - UI Cleanup: Mortgage Analysis Page Streamlining (September 29, 2025)
 
 ### ✅ **Technical Summary: Mortgage Analysis Page Optimization**
@@ -357,3 +386,4 @@ datetime
 **Last Updated:** September 19, 2025
 **Current Version:** 2.3.0 - Rent vs Buy Analysis Bug Fixes
 **Status:** Production Ready with Corrected Financial Analysis
+- to memorize
