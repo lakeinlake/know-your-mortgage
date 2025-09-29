@@ -1,5 +1,19 @@
 # Know Your Mortgage - Claude Code Instructions
 
+## 🚀 Version 2.4.1 - UI Cleanup: Mortgage Analysis Page Streamlining (September 29, 2025)
+
+### ✅ **Technical Summary: Mortgage Analysis Page Optimization**
+- **Problem**: Duplicate and redundant information in the Detailed Analysis tabs section.
+- **Removed Tabs**:
+  1. **"Interest & Amortization"**: Redundant with Total Interest Comparison bar chart in main analysis
+  2. **"Investment vs Extra Interest"**: Duplicated Net Worth Break-Even analysis from Metric 4
+  3. **"Home Equity Building"**: Redundant with comprehensive Net Worth Break-Even visualization
+- **Result**: Streamlined from 4 tabs to 1 essential "Year-by-Year Data" tab
+- **Verification**: Total Interest calculation verified as correct using standard amortization formula
+- **Benefits**: Cleaner UX, eliminated duplicate charts, preserved all unique insights
+
+---
+
 ## 🚀 Version 2.4.0 - Census API Integration & Debugging (September 24, 2025)
 
 ### ✅ **Technical Summary: Census API Debugging**
@@ -16,7 +30,7 @@
 ---
 
 ## Project Overview
-**Version 2.4.0** - Comprehensive financial education platform with corrected rent vs buy analysis and working Census API integration.
+**Version 2.4.1** - Comprehensive financial education platform with streamlined UI and verified calculation accuracy.
 
 **What it does:**
 - Compares mortgage scenarios (15-year, 30-year, cash purchase)

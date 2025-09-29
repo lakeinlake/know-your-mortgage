@@ -663,124 +663,33 @@ else:
                 delta=f"{lowest_interest['Scenario']} saves the most"
             )
 
-    # --- Detailed Tabs ---
-    st.markdown('<h2 class="sub-header">📋 Detailed Analysis</h2>', unsafe_allow_html=True)
-    tab1, tab2, tab3, tab4 = st.tabs(["Interest & Amortization", "Investment vs Extra Interest", "Home Equity Building", "Year-by-Year Data"])
+    # --- Detailed Analysis ---
+    st.markdown('<h2 class="sub-header">📋 Year-by-Year Data</h2>', unsafe_allow_html=True)
+    selected_scenario = st.selectbox("Select scenario for detailed breakdown:", list(results.keys()))
+    if selected_scenario:
+        df_yearly = pd.DataFrame(results[selected_scenario]['yearly_data'])
 
-    with tab1:
-        st.markdown("The **Total Interest Paid** bar chart is shown in the summary section above.")
-        st.info("Select a scenario from the dropdown in the **Year-by-Year Data** tab to see its detailed amortization schedule.")
+        # Expand monthly_costs dictionary into separate columns for better readability
+        if 'monthly_costs' in df_yearly.columns:
+            # Extract monthly costs into separate columns
+            monthly_costs_expanded = pd.json_normalize(df_yearly['monthly_costs'])
+            monthly_costs_expanded.columns = [f'monthly_{col}' for col in monthly_costs_expanded.columns]
 
-    with tab2:
-        st.markdown("**Investment Growth vs Extra Interest Cost (30-year vs 15-year)**")
-        if opportunity_analyses:
-            # Create chart for each down payment scenario
-            for dp_key, analysis in opportunity_analyses.items():
-                if 'error' not in analysis:
-                    fig_opportunity = go.Figure()
+            # Combine with main dataframe
+            df_yearly = pd.concat([df_yearly.drop('monthly_costs', axis=1), monthly_costs_expanded], axis=1)
 
-                    # Investment growth line
-                    fig_opportunity.add_trace(go.Scatter(
-                        x=analysis['years'],
-                        y=analysis['investment_growth'],
-                        mode='lines',
-                        name=f'{dp_key}: Investment Growth',
-                        line=dict(color='green'),
-                        hovertemplate='Year: %{x}<br>Investment Value: $%{y:,.0f}<extra></extra>'
-                    ))
+        # Format numeric columns
+        numeric_cols = df_yearly.select_dtypes(include=['number']).columns
+        format_dict = {}
+        for col in numeric_cols:
+            if col == 'year':
+                format_dict[col] = '{:.0f}'
+            elif 'monthly_' in col:
+                format_dict[col] = '${:,.0f}'
+            else:
+                format_dict[col] = '${:,.0f}'
 
-                    # Extra interest cost line
-                    fig_opportunity.add_trace(go.Scatter(
-                        x=analysis['years'],
-                        y=analysis['cumulative_interest_cost'],
-                        mode='lines',
-                        name=f'{dp_key}: Extra Interest Cost',
-                        line=dict(color='red'),
-                        hovertemplate='Year: %{x}<br>Extra Interest: $%{y:,.0f}<extra></extra>'
-                    ))
-
-                    # Mark break-even point
-                    if analysis.get('break_even_year'):
-                        break_even_year = analysis['break_even_year']
-                        break_even_value = analysis['investment_growth'][break_even_year - 1]
-                        fig_opportunity.add_trace(go.Scatter(
-                            x=[break_even_year],
-                            y=[break_even_value],
-                            mode='markers',
-                            name=f'Break-Even (Year {break_even_year})',
-                            marker=dict(size=10, color='orange'),
-                            hovertemplate=f'Break-Even Point<br>Year: {break_even_year}<br>Value: ${break_even_value:,.0f}<extra></extra>'
-                        ))
-
-                    fig_opportunity.update_layout(
-                        title=f"Investment Growth vs Extra Interest Cost - {dp_key}",
-                        xaxis_title="Year",
-                        yaxis_title="Amount ($)",
-                        hovermode='x unified',
-                        height=400
-                    )
-
-                    st.plotly_chart(fig_opportunity, width='stretch')
-
-                    # Show key metrics
-                    col1, col2, col3 = st.columns(3)
-                    monthly_diff = analysis['monthly_payment_difference']
-                    break_even = analysis.get('break_even_year', 'Never')
-                    total_extra_interest = analysis['total_extra_interest_30yr']
-
-                    col1.metric("Monthly Difference", f"${monthly_diff:,.0f}")
-                    col2.metric("Break-Even Point", f"Year {break_even}" if break_even != 'Never' else "Never")
-                    col3.metric("Total Extra Interest (30-yr)", f"${total_extra_interest:,.0f}")
-
-                    st.markdown("---")
-        else:
-            st.info("Analysis requires both 15-year and 30-year scenarios with matching down payments.")
-
-    with tab3:
-        st.markdown("**Home Equity Building Comparison**")
-        fig_equity = go.Figure()
-        for name, data in results.items():
-            fig_equity.add_trace(go.Scatter(
-                x=[d['year'] for d in data['yearly_data']],
-                y=[d['home_equity'] for d in data['yearly_data']],
-                mode='lines',
-                name=name,
-                hovertemplate=f'{name}<br>Year: %{{x}}<br>Home Equity: $%{{y:,.0f}}<extra></extra>'
-            ))
-        fig_equity.update_layout(
-            title="Home Equity Growth Over Time",
-            xaxis_title="Year",
-            yaxis_title="Home Equity ($)",
-            hovermode='x unified'
-        )
-        st.plotly_chart(fig_equity, width='stretch')
-
-    with tab4:
-        selected_scenario = st.selectbox("Select scenario for detailed breakdown:", list(results.keys()))
-        if selected_scenario:
-            df_yearly = pd.DataFrame(results[selected_scenario]['yearly_data'])
-
-            # Expand monthly_costs dictionary into separate columns for better readability
-            if 'monthly_costs' in df_yearly.columns:
-                # Extract monthly costs into separate columns
-                monthly_costs_expanded = pd.json_normalize(df_yearly['monthly_costs'])
-                monthly_costs_expanded.columns = [f'monthly_{col}' for col in monthly_costs_expanded.columns]
-
-                # Combine with main dataframe
-                df_yearly = pd.concat([df_yearly.drop('monthly_costs', axis=1), monthly_costs_expanded], axis=1)
-
-            # Format numeric columns
-            numeric_cols = df_yearly.select_dtypes(include=['number']).columns
-            format_dict = {}
-            for col in numeric_cols:
-                if col == 'year':
-                    format_dict[col] = '{:.0f}'
-                elif 'monthly_' in col:
-                    format_dict[col] = '${:,.0f}'
-                else:
-                    format_dict[col] = '${:,.0f}'
-
-            st.dataframe(df_yearly.style.format(format_dict), width='stretch')
+        st.dataframe(df_yearly.style.format(format_dict), width='stretch')
 
     # --- Assumptions and Calculations Section ---
     st.markdown("---")
