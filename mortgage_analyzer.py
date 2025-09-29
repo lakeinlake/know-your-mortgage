@@ -839,6 +839,301 @@ class MortgageAnalyzer:
             }
         }
 
+    def calculate_pmi_payment(self, loan_amount: float, home_price: float) -> float:
+        """
+        Calculate monthly PMI payment.
+
+        Args:
+            loan_amount: Principal loan amount
+            home_price: Home purchase price
+
+        Returns:
+            Monthly PMI payment (0 if LTV <= 80%)
+        """
+        ltv_ratio = loan_amount / home_price
+        if ltv_ratio <= 0.8:
+            return 0
+
+        # PMI is typically 0.5% to 1% annually on loan amount
+        # Using 0.5% as conservative estimate
+        annual_pmi = loan_amount * 0.005
+        return annual_pmi / 12
+
+    def calculate_total_monthly_costs(self, scenario: MortgageScenario, home_value: float = None) -> Dict:
+        """
+        Calculate all monthly homeownership costs including PMI, insurance, maintenance.
+
+        Args:
+            scenario: MortgageScenario object
+            home_value: Current home value (defaults to purchase price)
+
+        Returns:
+            Dictionary with breakdown of all monthly costs
+        """
+        if home_value is None:
+            home_value = scenario.home_price
+
+        costs = {}
+
+        # Principal and Interest
+        if scenario.loan_amount > 0:
+            costs['principal_interest'] = self.calculate_monthly_payment(
+                scenario.loan_amount, scenario.interest_rate, scenario.term_years
+            )
+        else:
+            costs['principal_interest'] = 0
+
+        # Property taxes
+        costs['property_tax'] = (home_value * scenario.property_tax_rate) / 12
+
+        # PMI
+        costs['pmi'] = self.calculate_pmi_payment(scenario.loan_amount, scenario.home_price)
+
+        # Homeowners insurance (0.3% annually)
+        costs['insurance'] = (home_value * 0.003) / 12
+
+        # Maintenance (1% annually)
+        costs['maintenance'] = (home_value * 0.01) / 12
+
+        # Total monthly cost
+        costs['total_monthly'] = sum(costs.values())
+
+        return costs
+
+    def analyze_scenario_corrected(self, scenario: MortgageScenario, available_cash: float) -> Dict:
+        """
+        Corrected mortgage scenario analysis without hardcoded assumptions.
+
+        Args:
+            scenario: MortgageScenario object with all parameters
+            available_cash: Total cash available for down payment and investments
+
+        Returns:
+            Dictionary with corrected analysis results
+        """
+        results = {
+            'scenario_name': scenario.name,
+            'monthly_costs': {},
+            'total_interest': 0,
+            'total_payments': 0,
+            'yearly_data': [],
+            'final_net_worth': 0,
+            'final_net_worth_adjusted': 0,
+            'pmi_required': False,
+            'ltv_ratio': 0
+        }
+
+        # Calculate LTV and PMI requirement
+        if scenario.loan_amount > 0:
+            ltv_ratio = scenario.loan_amount / scenario.home_price
+            results['ltv_ratio'] = ltv_ratio
+            results['pmi_required'] = ltv_ratio > 0.8
+
+        # Calculate closing costs (3% of home price)
+        closing_costs = scenario.home_price * 0.03
+
+        # Calculate remaining cash for investment after down payment and closing costs
+        remaining_cash = available_cash - scenario.down_payment - closing_costs
+        remaining_cash = max(0, remaining_cash - self.emergency_fund)
+
+        # Handle cash purchase
+        if scenario.loan_amount <= 0:
+            results['monthly_costs'] = self.calculate_total_monthly_costs(scenario)
+            results['monthly_costs']['principal_interest'] = 0  # No loan payment
+
+            for year in range(1, self.analysis_period + 1):
+                home_value = scenario.home_price * (1 + scenario.home_appreciation_rate)**year
+                costs = self.calculate_total_monthly_costs(scenario, home_value)
+
+                # Investment growth (remaining cash invested)
+                investment_value = self.calculate_investment_growth(
+                    remaining_cash, 0, scenario.stock_return_rate, year
+                )
+
+                # Net worth calculation
+                net_worth = home_value + investment_value + self.emergency_fund
+                net_worth_adjusted = self.adjust_for_inflation(
+                    net_worth, year, scenario.inflation_rate
+                )
+
+                results['yearly_data'].append({
+                    'year': year,
+                    'home_value': home_value,
+                    'loan_balance': 0,
+                    'home_equity': home_value,
+                    'investment_value': investment_value,
+                    'annual_housing_costs': costs['total_monthly'] * 12,
+                    'net_worth': net_worth,
+                    'net_worth_adjusted': net_worth_adjusted
+                })
+
+            if results['yearly_data']:
+                results['final_net_worth'] = results['yearly_data'][-1]['net_worth']
+                results['final_net_worth_adjusted'] = results['yearly_data'][-1]['net_worth_adjusted']
+
+            return results
+
+        # Generate amortization schedule for loan scenarios
+        amortization = self.calculate_amortization_schedule(
+            scenario.loan_amount, scenario.interest_rate, scenario.term_years
+        )
+
+        results['total_payments'] = len(amortization) * amortization.iloc[0]['Payment']
+        results['total_interest'] = results['total_payments'] - scenario.loan_amount
+
+        # Year-by-year analysis
+        for year in range(1, self.analysis_period + 1):
+            month_index = min(year * 12 - 1, len(amortization) - 1)
+
+            # Home value with appreciation
+            home_value = scenario.home_price * (1 + scenario.home_appreciation_rate)**year
+
+            # Loan balance
+            if year <= scenario.term_years:
+                loan_balance = amortization.iloc[month_index]['Balance'] if month_index < len(amortization) else 0
+            else:
+                loan_balance = 0
+
+            # Calculate costs for this year
+            costs = self.calculate_total_monthly_costs(scenario, home_value)
+
+            # Remove PMI if LTV drops below 78%
+            if loan_balance / home_value < 0.78:
+                costs['pmi'] = 0
+                costs['total_monthly'] = costs['principal_interest'] + costs['property_tax'] + costs['insurance'] + costs['maintenance']
+
+            # Calculate interest paid this year
+            year_start_month = (year - 1) * 12
+            year_end_month = min(year * 12, len(amortization))
+            if year_start_month < len(amortization) and year <= scenario.term_years:
+                yearly_interest = amortization.iloc[year_start_month:year_end_month]['Interest'].sum()
+            else:
+                yearly_interest = 0
+
+            # Investment calculations
+            # After mortgage is paid off, invest the former payment amount
+            if year > scenario.term_years:
+                monthly_investment = costs['principal_interest']  # Former mortgage payment
+            else:
+                monthly_investment = 0
+
+            investment_value = self.calculate_investment_growth(
+                remaining_cash, monthly_investment, scenario.stock_return_rate, year
+            )
+
+            # Net worth = home equity + investments + emergency fund
+            home_equity = home_value - loan_balance
+            net_worth = home_equity + investment_value + self.emergency_fund
+            net_worth_adjusted = self.adjust_for_inflation(
+                net_worth, year, scenario.inflation_rate
+            )
+
+            results['yearly_data'].append({
+                'year': year,
+                'home_value': home_value,
+                'loan_balance': loan_balance,
+                'home_equity': home_equity,
+                'investment_value': investment_value,
+                'annual_housing_costs': costs['total_monthly'] * 12,
+                'monthly_costs': costs,
+                'net_worth': net_worth,
+                'net_worth_adjusted': net_worth_adjusted,
+                'yearly_interest': yearly_interest
+            })
+
+        # Store initial monthly costs
+        results['monthly_costs'] = self.calculate_total_monthly_costs(scenario)
+
+        if results['yearly_data']:
+            results['final_net_worth'] = results['yearly_data'][-1]['net_worth']
+            results['final_net_worth_adjusted'] = results['yearly_data'][-1]['net_worth_adjusted']
+
+        return results
+
+    def analyze_opportunity_cost(self, results_30yr: Dict, results_15yr: Dict, stock_return_rate: float, post_payoff_investment_rate: float = 100.0) -> Dict:
+        """
+        Analyzes the opportunity cost of a 30-year mortgage vs. a 15-year mortgage.
+
+        Args:
+            results_30yr: The analysis results dictionary for the 30-year scenario.
+            results_15yr: The analysis results dictionary for the 15-year scenario.
+            stock_return_rate: The annual stock market return rate (as a percentage).
+            post_payoff_investment_rate: The percentage of the freed-up 15yr payment to invest after payoff.
+
+        Returns:
+            A dictionary containing the data for plotting and the break-even year.
+        """
+        # Extract P&I payments
+        payment_30yr = results_30yr['monthly_costs'].get('principal_interest', 0)
+        payment_15yr = results_15yr['monthly_costs'].get('principal_interest', 0)
+
+        if payment_15yr <= payment_30yr:
+            return {'error': '15-year payment is not higher than 30-year payment.'}
+
+        monthly_investment_diff = payment_15yr - payment_30yr
+        stock_return_decimal = stock_return_rate / 100
+
+        years = list(range(1, self.analysis_period + 1))
+        investment_growth = []
+        cumulative_interest_cost = []
+        break_even_year = None
+
+        # Extract yearly interest data
+        interest_15yr_yearly = {d['year']: d.get('yearly_interest', 0) for d in results_15yr['yearly_data']}
+        interest_30yr_yearly = {d['year']: d.get('yearly_interest', 0) for d in results_30yr['yearly_data']}
+
+        running_interest_15yr = 0
+        running_interest_30yr = 0
+
+        # --- Corrected Investment Calculation ---
+
+        # 1. Calculate the total value of investing the payment difference for the first 15 years
+        fv_of_diff_at_15_yrs = self.calculate_investment_growth(0, monthly_investment_diff, stock_return_decimal, 15)
+
+        # 2. Determine the new monthly contribution amount after the 15-year loan is paid off
+        post_payoff_monthly_investment = payment_15yr * (post_payoff_investment_rate / 100)
+
+        for year in years:
+            # --- Investment Growth Calculation ---
+            if year <= 15:
+                # For the first 15 years, the investment is simply the growth of the monthly payment difference
+                investment_balance = self.calculate_investment_growth(0, monthly_investment_diff, stock_return_decimal, year)
+            else: # After year 15
+                # The total value is now two parts:
+                # a) The original pot from the first 15 years, now growing as a lump sum
+                compounded_lump_sum = fv_of_diff_at_15_yrs * (1 + stock_return_decimal) ** (year - 15)
+
+                # b) The future value of the NEW contributions made from year 16 to the current 'year'
+                fv_of_new_contributions = self.calculate_investment_growth(
+                    0, post_payoff_monthly_investment, stock_return_decimal, year - 15
+                )
+
+                # The total balance is the sum of these two components
+                investment_balance = compounded_lump_sum + fv_of_new_contributions
+
+            investment_growth.append(investment_balance)
+
+            # --- Cumulative Interest Cost Calculation ---
+            running_interest_15yr += interest_15yr_yearly.get(year, 0)
+            running_interest_30yr += interest_30yr_yearly.get(year, 0)
+
+            # The "cost" is the extra interest paid on the 30-year loan so far
+            extra_interest = running_interest_30yr - running_interest_15yr
+            cumulative_interest_cost.append(extra_interest)
+
+            # --- Check for Break-Even Point ---
+            if break_even_year is None and investment_balance > extra_interest:
+                break_even_year = year
+
+        return {
+            'years': years,
+            'investment_growth': investment_growth,
+            'cumulative_interest_cost': cumulative_interest_cost,
+            'break_even_year': break_even_year,
+            'monthly_payment_difference': monthly_investment_diff,
+            'total_extra_interest_30yr': running_interest_30yr - running_interest_15yr
+        }
+
 
 class GoogleSheetsExporter:
     """Class to handle Google Sheets export functionality."""

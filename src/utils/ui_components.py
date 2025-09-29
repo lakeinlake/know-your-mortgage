@@ -21,7 +21,6 @@ class UIComponents:
         selected_state = st.sidebar.selectbox(
             "Select Your State",
             options=list(state_tax_rates.keys()),
-            index=list(state_tax_rates.keys()).index(SafeSessionState.get('selected_state')),
             key="selected_state"
         )
 
@@ -29,7 +28,6 @@ class UIComponents:
         federal_bracket = st.sidebar.selectbox(
             "Federal Tax Bracket (2024)",
             options=list(federal_brackets.keys()),
-            index=list(federal_brackets.keys()).index(SafeSessionState.get('federal_bracket')),
             key="federal_bracket"
         )
 
@@ -104,8 +102,8 @@ class UIComponents:
         st.sidebar.subheader("📈 Market Rates")
 
         # Interest rates
-        st.sidebar.slider("30-Year Rate (%)", 3.0, 10.0, SafeSessionState.get('rate_30yr'), 0.1, key="rate_30yr")
-        st.sidebar.slider("15-Year Rate (%)", 3.0, 10.0, SafeSessionState.get('rate_15yr'), 0.1, key="rate_15yr")
+        st.sidebar.slider("30-Year Rate (%)", 1.0, 10.0, SafeSessionState.get('rate_30yr'), 0.1, key="rate_30yr")
+        st.sidebar.slider("15-Year Rate (%)", 1.0, 10.0, SafeSessionState.get('rate_15yr'), 0.1, key="rate_15yr")
 
         st.sidebar.subheader("💼 Economic Assumptions")
 
@@ -137,11 +135,12 @@ class UIComponents:
         st.sidebar.number_input("Monthly Other Debts ($)", 0, 10000, SafeSessionState.get('monthly_debts'), 50, key="monthly_debts")
         st.sidebar.number_input("Cash Savings ($)", 0, 5000000, SafeSessionState.get('cash_savings'), 1000, key="cash_savings")
         st.sidebar.number_input("Stock Investments ($)", 0, 5000000, SafeSessionState.get('stock_investments'), 1000, key="stock_investments")
+        st.sidebar.number_input("Emergency Fund ($)", 0, 200000, SafeSessionState.get('emergency_fund'), 5000, key="emergency_fund")
 
         st.sidebar.subheader("🎯 Target Purchase")
         st.sidebar.number_input("Target Home Price ($)", 100000, 2000000, SafeSessionState.get('target_home_price'), 10000, key="target_home_price")
         st.sidebar.number_input("Target Down Payment ($)", 0, SafeSessionState.get('target_home_price'), SafeSessionState.get('target_down_payment'), 1000, key="target_down_payment")
-        st.sidebar.slider("Mortgage Rate (%)", 3.0, 10.0, SafeSessionState.get('mortgage_rate'), 0.1, key="mortgage_rate")
+        st.sidebar.slider("Mortgage Rate (%)", 1.0, 10.0, SafeSessionState.get('mortgage_rate'), 0.1, key="mortgage_rate")
 
         return AppState.get_financial_health_params()
 
@@ -154,7 +153,6 @@ class UIComponents:
         city = st.sidebar.selectbox(
             "Select City",
             options=["Both Cities", "Carmel", "Fishers"],
-            index=["Both Cities", "Carmel", "Fishers"].index(SafeSessionState.get('selected_city')),
             key="selected_city"
         )
 
@@ -162,7 +160,6 @@ class UIComponents:
         property_type = st.sidebar.selectbox(
             "Property Type",
             options=["Both Types", "Single Family", "Townhouse"],
-            index=["Both Types", "Single Family", "Townhouse"].index(SafeSessionState.get('property_type')),
             key="property_type"
         )
 
@@ -170,7 +167,6 @@ class UIComponents:
         metric = st.sidebar.selectbox(
             "Primary Metric",
             options=["Median Price", "Price per Sq Ft", "Days on Market", "Inventory", "Rental Yield"],
-            index=["Median Price", "Price per Sq Ft", "Days on Market", "Inventory", "Rental Yield"].index(SafeSessionState.get('selected_metric')),
             key="selected_metric"
         )
 
@@ -178,7 +174,6 @@ class UIComponents:
         analysis_type = st.sidebar.selectbox(
             "Analysis Focus",
             options=["Price Trends", "Demographics", "Investment Returns", "Market Timing"],
-            index=["Price Trends", "Demographics", "Investment Returns", "Market Timing"].index(SafeSessionState.get('analysis_type')),
             key="analysis_type"
         )
 
@@ -188,7 +183,6 @@ class UIComponents:
         time_range = st.sidebar.selectbox(
             "Time Period",
             options=["Historical (2019-2024)", "Projections (2025-2030)", "Complete (2019-2030)"],
-            index=["Historical (2019-2024)", "Projections (2025-2030)", "Complete (2019-2030)"].index(SafeSessionState.get('time_range')),
             key="time_range"
         )
 
